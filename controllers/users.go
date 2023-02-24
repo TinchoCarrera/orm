@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"ORM/authentication"
 	"ORM/commons"
 	"ORM/db"
 	"ORM/models"
@@ -9,16 +10,23 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+
+	if authentication.ValidateToken(w, r) == false {
+		commons.SendResponse(w, http.StatusNotFound, "Usuario sin permisos")
+		return
+
+	}
+
 	var users []models.User
 
 	db.DB.Find(&users)
 
 	//Envio el resultado
 	commons.SendResponse(w, http.StatusOK, users)
-
 }
 
 func GetUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +54,18 @@ func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	//guardo en user todo lo que viene por POSTs
 	json.NewDecoder(r.Body).Decode(&user)
 
+	//hasheo el password
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), 10)
+	if err != nil {
+		commons.SendResponse(w, http.StatusBadRequest, err.Error())
+		return
+	} else {
+		user.Password = string(hash)
+	}
+
 	//Creo un usuario
 	createdUser := db.DB.Create(&user)
-	err := createdUser.Error
+	err = createdUser.Error
 	if err != nil {
 		commons.SendResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -101,4 +118,41 @@ func UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	//Envio el resultado
 	commons.SendResponse(w, http.StatusOK, user)
+}
+
+func LoginUser(w http.ResponseWriter, r *http.Request) {
+	var loginUser models.LoginUser
+	//guardo en user todo lo que viene por POSTs
+	json.NewDecoder(r.Body).Decode(&loginUser)
+
+	//busco el user por mail
+	var user models.User
+	//db.DB.Find(&user, "email='"+loginUser.Email+"'")
+	db.DB.Find(&user, "email", loginUser.Email)
+
+	if user.ID == 0 {
+		commons.SendResponse(w, http.StatusNotFound, "El Usuario no existe")
+		return
+	}
+
+	//Comparo los hashes
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password))
+	fmt.Println("err:", err)
+	if err != nil {
+		commons.SendResponse(w, http.StatusUnauthorized, "Las contraseñas no coinciden")
+		return
+	}
+
+	//Creo el token de seguridad
+	tokenString := authentication.CreateToken(loginUser, w)
+
+	if tokenString != "" {
+		//Creamos la cookie
+		authentication.CreateCookie(tokenString, w)
+
+		//envío el resultado
+		commons.SendResponse(w, http.StatusOK, user)
+
+	}
+
 }

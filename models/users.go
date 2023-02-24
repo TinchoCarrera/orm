@@ -12,3 +12,8 @@ type User struct {
 	Password  string `json:"password,omitempy"` //Le digo al json que no lo devuelva si está vacío
 	Role      string `json:"role"`
 }
+
+type LoginUser struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}

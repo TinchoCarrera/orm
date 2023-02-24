@@ -1,9 +1,9 @@
 package routes
 
 import (
-	"ORM/authentication"
 	"ORM/controllers"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -29,11 +29,10 @@ func StartRoutes() {
 	r.HandleFunc("/tasks/{id}", controllers.UpdateTaskHandler).Methods("PUT")
 
 	//login
-	r.HandleFunc("/login", authentication.Login).Methods("POST")
-	r.HandleFunc("/validatetoken", authentication.ValidateToken).Methods("POST")
+	r.HandleFunc("/login", controllers.LoginUser).Methods("POST")
 
 	//Inicio el Servidor
-	http.ListenAndServe(":8000", r)
+	http.ListenAndServe(":"+os.Getenv("PORT"), r)
 
 	//esto es 100% nuevo
 
